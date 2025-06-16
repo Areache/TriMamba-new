@@ -73,14 +73,18 @@ def combine(tree, operator, a_flat, b_flat):
     c_flat, _ = tree_flatten(c)
     return c_flat
 
-
+# from jax import lax
 def _scan(tree, operator, elems, axis: int):
     """Perform scan on `elems`."""
     num_elems = elems[0].shape[axis]
 
     if num_elems < 2:
         return elems
-
+    # return lax.cond(
+    #     num_elems < 2,            # 条件
+    #     lambda: elems,            # 如果 True 返回 elems
+    # )
+    
     # Combine adjacent pairs of elements.
     reduced_elems = combine(
         tree,
@@ -126,30 +130,70 @@ def _scan(tree, operator, elems, axis: int):
 
 
 # Pytorch impl. of jax.lax.associative_scan
+# def associative_scan(operator: Callable, elems, axis: int = 0, reverse: bool = False):
+#     # if not callable(operator):
+#     #     raise TypeError("lax.associative_scan: fn argument should be callable.")
+#     elems_flat, tree = tree_flatten(elems)
+
+#     if reverse:
+#         elems_flat = [torch.flip(elem, [axis]) for elem in elems_flat]
+
+#     assert (
+#         axis >= 0 or axis < elems_flat[0].ndim
+#     ), "Axis should be within bounds of input"
+#     num_elems = int(elems_flat[0].shape[axis])
+#     if not all(int(elem.shape[axis]) == num_elems for elem in elems_flat[1:]):
+#         raise ValueError(
+#             "Array inputs to associative_scan must have the same "
+#             "first dimension. (saw: {})".format([elem.shape for elem in elems_flat])
+#         )
+
+#     scans = _scan(tree, operator, elems_flat, axis)
+
+#     if reverse:
+#         scans = [torch.flip(scanned, [axis]) for scanned in scans]
+
+#     return tree_unflatten(scans, tree)
+
 def associative_scan(operator: Callable, elems, axis: int = 0, reverse: bool = False):
-    # if not callable(operator):
-    #     raise TypeError("lax.associative_scan: fn argument should be callable.")
-    elems_flat, tree = tree_flatten(elems)
+    """
+    Pure PyTorch version of associative_scan that supports tuple of tensors.
+
+    Args:
+        operator: a binary function (x, y) -> z (z can also be tuple)
+        elems: tuple of tensors, all with the same shape on 'axis'
+        axis: scan dimension
+        reverse: if True, do scan in reverse order
+
+    Returns:
+        Tuple: same structure as input, each is a list of tensors (one per step)
+    """
+    if not elems:
+        return ()
+
+    num_elems = elems[0].shape[axis]
+    elems_unstacked = [list(torch.unbind(t, dim=axis)) for t in elems]  # shape: [L][...] for each tensor
 
     if reverse:
-        elems_flat = [torch.flip(elem, [axis]) for elem in elems_flat]
+        elems_unstacked = [list(reversed(seq)) for seq in elems_unstacked]
 
-    assert (
-        axis >= 0 or axis < elems_flat[0].ndim
-    ), "Axis should be within bounds of input"
-    num_elems = int(elems_flat[0].shape[axis])
-    if not all(int(elem.shape[axis]) == num_elems for elem in elems_flat[1:]):
-        raise ValueError(
-            "Array inputs to associative_scan must have the same "
-            "first dimension. (saw: {})".format([elem.shape for elem in elems_flat])
-        )
+    outputs = []
+    prev = tuple(seq[0] for seq in elems_unstacked)
+    outputs.append(prev)
 
-    scans = _scan(tree, operator, elems_flat, axis)
+    for i in range(1, num_elems):
+        current = tuple(seq[i] for seq in elems_unstacked)
+        prev = operator(prev, current)
+        outputs.append(prev)
 
     if reverse:
-        scans = [torch.flip(scanned, [axis]) for scanned in scans]
+        outputs = list(reversed(outputs))
 
-    return tree_unflatten(scans, tree)
+    # Transpose back to tuple of sequences
+    out_seqs = list(zip(*outputs))  # from List[Tuple] to Tuple[List]
+    out_seqs = tuple(torch.stack(seq, dim=axis) for seq in out_seqs)
+
+    return out_seqs
 
 
 def test_associative_scan(shape=(1, 24, 24)):

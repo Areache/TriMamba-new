@@ -108,12 +108,17 @@ class Module(pl.LightningModule):
         previous_states: Optional[LstmStates] = None,
         retrieve_detections: bool = True,
         targets=None,
+
     ) -> Tuple[Union[th.Tensor, None], Union[Dict[str, th.Tensor], None], LstmStates]:
+        # import pdb; pdb.set_trace()
+        # print('Input shape:', event_tensor.shape) #onnx:[1, 12, 20, 360, 640]
+
         return self.mdl(
             x=event_tensor,
-            previous_states=previous_states,
+            # previous_states=previous_states,
             retrieve_detections=retrieve_detections,
             targets=targets,
+            # batch=batch, mode=Mode.VAL
         )
 
     def get_worker_id_from_batch(self, batch: Any) -> int:
@@ -135,10 +140,11 @@ class Module(pl.LightningModule):
         is_first_sample = data[DataType.IS_FIRST_SAMPLE]
         token_mask_sequence = data.get(DataType.TOKEN_MASK, None)
 
-        self.mode_2_rnn_states[mode].reset(
-            worker_id=worker_id, indices_or_bool_tensor=is_first_sample
-        )
-
+        # self.mode_2_rnn_states[mode].reset(
+        #     worker_id=worker_id, indices_or_bool_tensor=is_first_sample
+        # )
+        # import pdb; pdb.set_trace()
+        # print('Input shape:', ev_tensor_sequence.shape)
         sequence_len = len(ev_tensor_sequence)
         assert sequence_len > 0
         batch_size = len(sparse_obj_labels[0])
@@ -147,7 +153,7 @@ class Module(pl.LightningModule):
         else:
             assert self.mode_2_batch_size[mode] == batch_size
 
-        prev_states = self.mode_2_rnn_states[mode].get_states(worker_id=worker_id)
+        # prev_states = self.mode_2_rnn_states[mode].get_states(worker_id=worker_id)
         backbone_feature_selector = BackboneFeatureSelector()
         ev_repr_selector = EventReprSelector()
         obj_labels = list()
@@ -171,14 +177,15 @@ class Module(pl.LightningModule):
         else:
             assert self.mode_2_hw[mode] == ev_tensor_sequence.shape[-2:]
 
-        backbone_features, states = self.mdl.forward_backbone(
+        backbone_features = self.mdl.forward_backbone(
+        # backbone_features, states = self.mdl.forward_backbone(
             x=ev_tensor_sequence,
-            previous_states=prev_states,
+            # previous_states=prev_states,
             token_mask=token_mask_sequence,
             train_step=True,
         )
-        prev_states = states
-
+        # prev_states = states
+        # import pdb; pdb.set_trace()
         for tidx, curr_labels in enumerate(sparse_obj_labels):
             (
                 current_labels,
@@ -198,9 +205,9 @@ class Module(pl.LightningModule):
                     selected_indices=valid_batch_indices,
                 )
 
-        self.mode_2_rnn_states[mode].save_states_and_detach(
-            worker_id=worker_id, states=prev_states
-        )
+        # self.mode_2_rnn_states[mode].save_states_and_detach(
+        #     worker_id=worker_id, states=prev_states
+        # )
         assert len(obj_labels) > 0
         # Batch the backbone features and labels to parallelize the detection code.
         selected_backbone_features = (
@@ -270,6 +277,7 @@ class Module(pl.LightningModule):
         return output
 
     def _val_test_step_impl(self, batch: Any, mode: Mode) -> Optional[STEP_OUTPUT]:
+        # import pdb; pdb.set_trace()
         data = self.get_data_from_batch(batch)
         worker_id = self.get_worker_id_from_batch(batch)
 
@@ -305,14 +313,16 @@ class Module(pl.LightningModule):
             self.mode_2_hw[mode] = tuple(ev_tensor_sequence.shape[-2:])
         else:
             assert self.mode_2_hw[mode] == ev_tensor_sequence.shape[-2:]
-
-        backbone_features, states = self.mdl.forward_backbone(
+        import pdb; pdb.set_trace() 
+        # print(ev_tensor_sequence.shape)    
+        # backbone_features, states = self.mdl.forward_backbone(
+        backbone_features = self.mdl.forward_backbone(
             x=ev_tensor_sequence,
-            previous_states=prev_states,
+            # previous_states=prev_states,
             train_step=False,
         )
-
-        prev_states = states
+        # import pdb; pdb.set_trace() 
+        # prev_states = states
 
         for tidx in range(sequence_len):
             collect_predictions = (tidx == sequence_len - 1) or (
@@ -337,18 +347,22 @@ class Module(pl.LightningModule):
                         event_representations=ev_tensor_sequence[tidx],
                         selected_indices=valid_batch_indices,
                     )
-        self.mode_2_rnn_states[mode].save_states_and_detach(
-            worker_id=worker_id, states=prev_states
-        )
+        # self.mode_2_rnn_states[mode].save_states_and_detach(
+        #     worker_id=worker_id, states=prev_states
+        # )
         if len(obj_labels) == 0:
             return {ObjDetOutput.SKIP_VIZ: True}
+
         selected_backbone_features = (
             backbone_feature_selector.get_batched_backbone_features()
         )
+        # predictions, _ = self.mdl.forward_detect(
+        
+        # selected_backbone_features[1-4].shape: torch.Size([60, 48, 96, 160]) [60, 96, 48, 80] [60, 192, 24, 40] [60, 384, 12, 20]
         predictions, _ = self.mdl.forward_detect(
             backbone_features=selected_backbone_features
         )
-
+        # import pdb; pdb.set_trace()  
         pred_processed = postprocess(
             prediction=predictions,
             num_classes=self.mdl_config.head.num_classes,
@@ -372,8 +386,7 @@ class Module(pl.LightningModule):
 
         if self.started_training:
             self.mode_2_psee_evaluator[mode].add_labels(loaded_labels_proph)
-            self.mode_2_psee_evaluator[mode].add_predictions(yolox_preds_proph)
-
+            self.mode_2_psee_evaluator[mode].add_predictions(yolox_preds_proph)     
         return output
 
     def validation_step(self, batch: Any, batch_idx: int) -> Optional[STEP_OUTPUT]:

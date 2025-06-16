@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Union
 
 import wandb
+# wandb.disabled = True
 from omegaconf import DictConfig, OmegaConf
 
 from loggers.wandb_logger import WandbLogger
@@ -44,6 +45,7 @@ def get_ckpt_path(logger: WandbLogger, wandb_config: DictConfig) -> Union[Path, 
     artifact_local_file = cfg.artifact_local_file
     if artifact_local_file is not None:
         artifact_local_file = Path(artifact_local_file)
+    # import pdb; pdb.set_trace()
     if isinstance(logger, WandbLogger):
         resume_path = logger.get_checkpoint(
             artifact_name=artifact_name, artifact_filepath=artifact_local_file

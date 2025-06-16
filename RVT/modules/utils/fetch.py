@@ -6,6 +6,7 @@ from modules.detection import Module as rnn_det_module
 
 
 def fetch_model_module(config: DictConfig) -> pl.LightningModule:
+    # import pdb; pdb.set_trace()
     model_str = config.model.name
     if model_str == "rnndet":
         return rnn_det_module(config)

@@ -48,6 +48,8 @@ class BaseConv(nn.Module):
         self.act = get_activation(act, inplace=True)
 
     def forward(self, x):
+        # import pdb; pdb.set_trace()
+        # print(x.shape) # onnx: [1, 12, 384, 12, 20] # normal: [60, 384, 12, 20]
         return self.act(self.bn(self.conv(x)))
 
     def fuseforward(self, x):

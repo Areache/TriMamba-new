@@ -47,9 +47,13 @@ class YOLOPAFPN(nn.Module):
 
         ##################################
 
-        self.upsample = lambda x: nn.functional.interpolate(
-            x, scale_factor=2, mode="nearest-exact"
-        )
+        # self.upsample = lambda x: nn.functional.interpolate(
+        #     x, scale_factor=2, mode="nearest-exact"
+        # )
+        def upsample_nearest(x):
+            return x.repeat_interleave(2, dim=2).repeat_interleave(2, dim=3)
+        self.upsample = upsample_nearest
+
         self.lateral_conv0 = BaseConv(in_channels[2], in_channels[1], 1, 1, act=act)
         self.C3_p4 = CSPLayer(
             2 * in_channels[1],
@@ -109,6 +113,7 @@ class YOLOPAFPN(nn.Module):
         Returns:
             Tuple[Tensor]: FPN feature.
         """
+        # import pdb; pdb.set_trace()
         features = [input[f] for f in self.in_features]
         x2, x1, x0 = features
 

@@ -11,6 +11,7 @@ import torch
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 from torch.backends import cuda, cudnn
+import torch.onnx 
 
 cuda.matmul.allow_tf32 = True
 cudnn.allow_tf32 = True

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import torch
 from torch.backends import cuda, cudnn
+import torch.onnx 
 
 cuda.matmul.allow_tf32 = True
 cudnn.allow_tf32 = True
@@ -60,8 +61,17 @@ def main(config: DictConfig):
     # ---------------------
 
     module = fetch_model_module(config=config)
-    module = Module.load_from_checkpoint(str(ckpt_path), **{"full_config": config})
+    # from lightning.pytorch.utilities.cloud_io import load as pl_load
+    # ckpt = pl_load(str(ckpt_path))
+    # module = Module(**{"full_config": config})
+    # module.load_state_dict(ckpt["state_dict"], strict=False)
+    # checkpoint = torch.load(str(ckpt_path), map_location="cpu")
 
+    # # 加载参数（strict=False 忽略不匹配的 key）
+    # model = Module(full_config=config)
+    # model.load_state_dict(checkpoint["state_dict"], strict=False)
+    module = Module.load_from_checkpoint(str(ckpt_path), **{"full_config": config}, strict=False)
+    # import pdb; pdb.set_trace()
     # ---------------------
     # Callbacks and Misc
     # ---------------------
@@ -81,6 +91,7 @@ def main(config: DictConfig):
         precision=config.training.precision,
         # move_metrics_to_cpu=False,
     )
+    # import pdb; pdb.set_trace()
     with torch.inference_mode():
         if config.use_test_set:
             trainer.test(model=module, datamodule=data_module, ckpt_path=str(ckpt_path))

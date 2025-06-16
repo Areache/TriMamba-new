@@ -208,8 +208,8 @@ class ConvDownsampling_Cf2Cl(DownsampleBase):
 
     def forward(self, x: torch.Tensor):
         x = self.conv(x)
-        x = nChw_2_nhwC(x)
-        x = self.norm(x)
+        # x = nChw_2_nhwC(x)
+        # x = self.norm(x)
         return x
 
     @staticmethod

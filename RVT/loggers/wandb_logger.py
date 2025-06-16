@@ -82,15 +82,15 @@ class WandbLogger(Logger):
     def get_checkpoint(
         self, artifact_name: str, artifact_filepath: Optional[Path] = None
     ) -> Path:
-        artifact = self.experiment.use_artifact(artifact_name)
-        if artifact_filepath is None:
-            assert artifact is not None, (
-                "You are probably using DDP, "
-                "in which case you should provide an artifact filepath."
-            )
-            # TODO: specify download directory
-            artifact_dir = artifact.download()
-            artifact_filepath = next(Path(artifact_dir).iterdir())
+        # artifact = self.experiment.use_artifact(artifact_name)
+        # if artifact_filepath is None:
+        #     assert artifact is not None, (
+        #         "You are probably using DDP, "
+        #         "in which case you should provide an artifact filepath."
+        #     )
+        #     # TODO: specify download directory
+        #     artifact_dir = artifact.download()
+        #     artifact_filepath = next(Path(artifact_dir).iterdir())
         assert artifact_filepath.exists()
         assert artifact_filepath.suffix == ".ckpt"
         return artifact_filepath
@@ -269,6 +269,20 @@ class WandbLogger(Logger):
             api = wandb.Api()
             self._public_run = api.run(path=runpath)
         return self._public_run
+
+    # def _get_public_run(self):
+    #     if self._public_run is None:
+    #         experiment = self.experiment
+    #         runpath = (
+    #             experiment.entity
+    #             + "/"
+    #             + experiment.project
+    #             + "/"
+    #             + experiment.id
+    #         )
+    #         api = wandb.Api()
+    #         self._public_run = api.run(path=runpath)
+    #     return self._public_run
 
     def _num_logged_artifact(self):
         public_run = self._get_public_run()
